@@ -28,6 +28,7 @@
   .row-sub { font-size: 8pt; color: #888; margin-top: 2px; }
   .badge { font-size: 8pt; font-weight: bold; padding: 3px 10px; border-radius: 12px; white-space: nowrap; }
   .badge-ok { background: #d4edda; color: #1a6b34; }
+  .badge-extern { background: #d0e8ff; color: #1F4E79; }
   .badge-warn { background: #fff3cd; color: #856404; }
   .badge-danger { background: #f8d7da; color: #721c24; }
   .badge-none { background: #e9ecef; color: #6c757d; }
@@ -85,8 +86,11 @@ async function checkAusweis() {
       return;
     }
 
+    // Stufe 1 Status ermitteln
+    const s1Bestanden = d.s1_praxis === 'Bestanden' && d.s1_theorie === 'Bestanden';
+    const s1Extern = d.nachweis_stufe1 === 'ja';
+
     // Ablaufdatum LaSi berechnen
-    let lasiAblauf = '';
     let lasiAblaufBadge = 'badge-none';
     let lasiAblaufText = '';
     if (d.lasi_datum) {
@@ -94,55 +98,53 @@ async function checkAusweis() {
       const lasiDate = new Date(parts[2], parts[1]-1, parts[0]);
       const ablauf = new Date(lasiDate);
       ablauf.setFullYear(ablauf.getFullYear() + 2);
-      lasiAblauf = ablauf.toLocaleDateString('de-DE');
+      const lasiAblauf = ablauf.toLocaleDateString('de-DE');
       const heute = new Date();
       if (ablauf < heute) {
         lasiAblaufBadge = 'badge-danger';
-        lasiAblaufText = '⚠️ Abgelaufen';
+        lasiAblaufText = '\u26a0\ufe0f Abgelaufen';
       } else {
-        const diffMs = ablauf - heute;
-        const diffDays = Math.ceil(diffMs / (1000*60*60*24));
+        const diffDays = Math.ceil((ablauf - heute) / (1000*60*60*24));
         if (diffDays <= 90) {
           lasiAblaufBadge = 'badge-warn';
-          lasiAblaufText = '⚠️ läuft bald ab';
+          lasiAblaufText = '\u26a0\ufe0f l\u00e4uft bald ab';
         } else {
           lasiAblaufBadge = 'badge-ok';
-          lasiAblaufText = 'gültig bis ' + lasiAblauf;
+          lasiAblaufText = 'g\u00fcltig bis ' + lasiAblauf;
         }
       }
     }
 
     function row(label, sub, badgeText, badgeClass) {
-      return `<div class="row">
-        <div><div class="row-label">${label}</div><div class="row-sub">${sub}</div></div>
-        <span class="badge ${badgeClass}">${badgeText}</span>
-      </div>`;
+      return '<div class="row"><div><div class="row-label">' + label + '</div><div class="row-sub">' + sub + '</div></div><span class="badge ' + badgeClass + '">' + badgeText + '</span></div>';
     }
 
-    let html = `
-      <div class="person-header">
-        <div class="person-name">${d.vorname} ${d.name}</div>
-        <div class="person-regnr">Reg.-Nr. ${regnr}</div>
-      </div>
-      <div class="section-title">Stapler Stufe 1</div>
-      ${d.s1_praxis === 'Bestanden'
-        ? row('Praxis', 'Prüfung am ' + (d.s1_datum || '—'), '✓ Bestanden', 'badge-ok')
-        : row('Praxis', '—', 'nicht absolviert', 'badge-none')}
-      <div class="section-title">Stapler Stufe 2</div>
-      ${d.schubmast === 'Bestanden'
-        ? row('Schubmast', 'Prüfung am ' + (d.schubmast_datum || '—'), '✓ Bestanden', 'badge-ok')
-        : row('Schubmast', d.schubmast_gebucht === 'Ja' ? 'gebucht' : 'nicht absolviert', d.schubmast_gebucht === 'Ja' ? 'ausstehend' : '—', d.schubmast_gebucht === 'Ja' ? 'badge-warn' : 'badge-none')}
-      ${d.komm === 'Bestanden'
-        ? row('Kommissionierer', 'Prüfung am ' + (d.komm_datum || '—'), '✓ Bestanden', 'badge-ok')
-        : row('Kommissionierer', d.komm_gebucht === 'Ja' ? 'gebucht' : 'nicht absolviert', d.komm_gebucht === 'Ja' ? 'ausstehend' : '—', d.komm_gebucht === 'Ja' ? 'badge-warn' : 'badge-none')}
-      ${d.schmal === 'Bestanden'
-        ? row('Schmalgang', 'Prüfung am ' + (d.schmal_datum || '—'), '✓ Bestanden', 'badge-ok')
-        : row('Schmalgang', d.schmal_gebucht === 'Ja' ? 'gebucht' : 'nicht absolviert', d.schmal_gebucht === 'Ja' ? 'ausstehend' : '—', d.schmal_gebucht === 'Ja' ? 'badge-warn' : 'badge-none')}
-      <div class="section-title">Ladungssicherung VDI 2700</div>
-      ${d.lasi_status === 'Bestanden'
-        ? row('Ladungssicherung', 'Prüfung am ' + (d.lasi_datum || '—'), lasiAblaufText, lasiAblaufBadge)
-        : row('Ladungssicherung', '—', 'nicht absolviert', 'badge-none')}
-    `;
+    // Stufe 1 Zeile
+    let s1Row = '';
+    if (s1Extern && !s1Bestanden) {
+      s1Row = row('Stufe 1', 'Extern nachgewiesen', '\u2713 Extern', 'badge-extern');
+    } else if (s1Bestanden) {
+      s1Row = row('Stufe 1', 'Pr\u00fcfung am ' + (d.s1_datum || '\u2014'), '\u2713 Bestanden', 'badge-ok');
+    } else {
+      s1Row = row('Stufe 1', '\u2014', 'nicht absolviert', 'badge-none');
+    }
+
+    let html = '<div class="person-header"><div class="person-name">' + d.vorname + ' ' + d.name + '</div><div class="person-regnr">Reg.-Nr. ' + regnr + '</div></div>';
+    html += '<div class="section-title">Stapler Stufe 1</div>' + s1Row;
+    html += '<div class="section-title">Stapler Stufe 2</div>';
+    html += (d.schubmast === 'Bestanden')
+      ? row('Schubmast', 'Pr\u00fcfung am ' + (d.schubmast_datum || '\u2014'), '\u2713 Bestanden', 'badge-ok')
+      : row('Schubmast', d.schubmast_gebucht === 'Ja' ? 'gebucht' : 'nicht absolviert', d.schubmast_gebucht === 'Ja' ? 'ausstehend' : '\u2014', d.schubmast_gebucht === 'Ja' ? 'badge-warn' : 'badge-none');
+    html += (d.komm === 'Bestanden')
+      ? row('Kommissionierer', 'Pr\u00fcfung am ' + (d.komm_datum || '\u2014'), '\u2713 Bestanden', 'badge-ok')
+      : row('Kommissionierer', d.komm_gebucht === 'Ja' ? 'gebucht' : 'nicht absolviert', d.komm_gebucht === 'Ja' ? 'ausstehend' : '\u2014', d.komm_gebucht === 'Ja' ? 'badge-warn' : 'badge-none');
+    html += (d.schmal === 'Bestanden')
+      ? row('Schmalgang', 'Pr\u00fcfung am ' + (d.schmal_datum || '\u2014'), '\u2713 Bestanden', 'badge-ok')
+      : row('Schmalgang', d.schmal_gebucht === 'Ja' ? 'gebucht' : 'nicht absolviert', d.schmal_gebucht === 'Ja' ? 'ausstehend' : '\u2014', d.schmal_gebucht === 'Ja' ? 'badge-warn' : 'badge-none');
+    html += '<div class="section-title">Ladungssicherung VDI 2700</div>';
+    html += (d.lasi_status === 'Bestanden')
+      ? row('Ladungssicherung', 'Pr\u00fcfung am ' + (d.lasi_datum || '\u2014'), lasiAblaufText, lasiAblaufBadge)
+      : row('Ladungssicherung', '\u2014', 'nicht absolviert', 'badge-none');
 
     content.innerHTML = html;
 
@@ -151,7 +153,6 @@ async function checkAusweis() {
   }
 }
 
-// URL-Parameter automatisch auslesen
 window.onload = function() {
   const params = new URLSearchParams(window.location.search);
   const id = params.get('id');
