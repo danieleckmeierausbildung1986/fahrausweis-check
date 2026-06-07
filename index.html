@@ -124,7 +124,7 @@ async function checkAusweis() {
     if (s1Extern && !s1Bestanden) {
       s1Row = row('Stufe 1', 'Extern nachgewiesen', '\u2713 Extern', 'badge-extern');
     } else if (s1Bestanden) {
-      s1Row = row('Stufe 1', 'Pr\u00fcfung am ' + (d.s1_datum || '\u2014'), '\u2713 Bestanden', 'badge-ok');
+      s1Row = row('Stufe 1', 'Pr\u00fcfung am ' + (d.s1_datum ? d.s1_datum.split('-').reverse().join('.') : '\u2014'), '\u2713 Bestanden', 'badge-ok');
     } else {
       s1Row = row('Stufe 1', '\u2014', 'nicht absolviert', 'badge-none');
     }
