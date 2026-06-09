@@ -16,8 +16,10 @@
   .search-row { display: flex; gap: 8px; }
   .search-row input { flex: 1; padding: 10px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 11pt; }
   .search-row input:focus { outline: none; border-color: #1F4E79; }
+  .search-row input:read-only { background: #f5f5f5; color: #888; cursor: not-allowed; }
   .search-row button { background: #1F4E79; color: white; border: none; border-radius: 4px; padding: 10px 18px; font-size: 10pt; font-weight: bold; cursor: pointer; }
   .search-row button:hover { background: #163d61; }
+  .token-info { font-size: 9pt; color: #888; margin-top: 8px; font-style: italic; }
   .result-box { background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 8px 8px; padding: 20px; }
   .person-header { border-bottom: 1px solid #eee; padding-bottom: 12px; margin-bottom: 16px; }
   .person-name { font-size: 14pt; font-weight: bold; color: #1F4E79; }
@@ -50,6 +52,7 @@
       <input type="text" id="regnr-input" placeholder="z.B. 2026-075" />
       <button onclick="checkAusweis()">Prüfen</button>
     </div>
+    <div class="token-info" id="token-info"></div>
   </div>
 
   <div id="result-box" class="result-box">
@@ -62,9 +65,20 @@
 <script>
 const FLOW_URL = 'https://default8af25f9034bc4ef4aba22ab6f641d5.01.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/349e4e8b1d45432b817f42bcd294571f/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=pLzuKj8NElFRsDTambfHKUsVmz76SVbjVv7kcXMEVo8';
 
+let urlToken = null;
+
 async function checkAusweis() {
   const regnr = document.getElementById('regnr-input').value.trim();
   if (!regnr) return;
+
+  if (urlToken) {
+    const urlId = new URLSearchParams(window.location.search).get('id');
+    if (regnr !== urlId) {
+      document.getElementById('result-box').style.display = 'block';
+      document.getElementById('result-content').innerHTML = '<div class="error">Ungültige Anfrage.</div>';
+      return;
+    }
+  }
 
   const box = document.getElementById('result-box');
   const content = document.getElementById('result-content');
@@ -72,10 +86,13 @@ async function checkAusweis() {
   content.innerHTML = '<div class="loading">Daten werden abgerufen...</div>';
 
   try {
+    const body = { registrierungsnummer: regnr };
+    if (urlToken) body.token = urlToken;
+
     const resp = await fetch(FLOW_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ registrierungsnummer: regnr })
+      body: JSON.stringify(body)
     });
 
     if (!resp.ok) throw new Error('Nicht gefunden');
@@ -86,11 +103,9 @@ async function checkAusweis() {
       return;
     }
 
-    // Stufe 1 Status ermitteln
     const s1Bestanden = d.s1_praxis === 'Bestanden' && d.s1_theorie === 'Bestanden';
     const s1Extern = d.nachweis_stufe1 === 'ja';
 
-    // Ablaufdatum LaSi berechnen
     let lasiAblaufBadge = 'badge-none';
     let lasiAblaufText = '';
     if (d.lasi_datum) {
@@ -119,7 +134,6 @@ async function checkAusweis() {
       return '<div class="row"><div><div class="row-label">' + label + '</div><div class="row-sub">' + sub + '</div></div><span class="badge ' + badgeClass + '">' + badgeText + '</span></div>';
     }
 
-    // Stufe 1 Zeile
     let s1Row = '';
     if (s1Extern && !s1Bestanden) {
       s1Row = row('Stufe 1', 'Extern nachgewiesen', '\u2713 Extern', 'badge-extern');
@@ -156,8 +170,15 @@ async function checkAusweis() {
 window.onload = function() {
   const params = new URLSearchParams(window.location.search);
   const id = params.get('id');
+  const token = params.get('token');
+
   if (id) {
     document.getElementById('regnr-input').value = id;
+    if (token) {
+      urlToken = token;
+      document.getElementById('regnr-input').readOnly = true;
+      document.getElementById('token-info').textContent = 'QR-Code verifiziert – Nummer gesperrt';
+    }
     checkAusweis();
   }
 };
