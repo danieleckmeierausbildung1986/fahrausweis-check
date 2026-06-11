@@ -1,183 +1,233 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fahrausweis-Verifikation</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; background: #f0f0f0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 30px 16px; }
-  .container { width: 100%; max-width: 480px; }
-  .header { background: #1F4E79; color: white; border-radius: 8px 8px 0 0; padding: 16px 20px; text-align: center; }
-  .header h1 { font-size: 14pt; font-weight: bold; letter-spacing: 0.5px; }
-  .header p { font-size: 9pt; margin-top: 4px; opacity: 0.85; }
-  .search-box { background: white; padding: 20px; border-left: 1px solid #ddd; border-right: 1px solid #ddd; }
-  .search-box label { font-size: 9pt; color: #555; font-weight: bold; text-transform: uppercase; display: block; margin-bottom: 6px; }
-  .search-row { display: flex; gap: 8px; }
-  .search-row input { flex: 1; padding: 10px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 11pt; }
-  .search-row input:focus { outline: none; border-color: #1F4E79; }
-  .search-row button { background: #1F4E79; color: white; border: none; border-radius: 4px; padding: 10px 18px; font-size: 10pt; font-weight: bold; cursor: pointer; }
-  .search-row button:hover { background: #163d61; }
-  .result-box { background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 8px 8px; padding: 20px; }
-  .result-box-notop { background: white; border: 1px solid #ddd; border-radius: 0 0 8px 8px; padding: 20px; }
-  .person-header { border-bottom: 1px solid #eee; padding-bottom: 12px; margin-bottom: 16px; }
-  .person-name { font-size: 14pt; font-weight: bold; color: #1F4E79; }
-  .person-regnr { font-size: 9pt; color: #888; margin-top: 2px; }
-  .section-title { font-size: 8pt; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin: 14px 0 8px; }
-  .row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 4px; margin-bottom: 6px; background: #f9f9f9; border: 1px solid #eee; }
-  .row-label { font-size: 9pt; color: #333; font-weight: bold; }
-  .row-sub { font-size: 8pt; color: #888; margin-top: 2px; }
-  .badge { font-size: 8pt; font-weight: bold; padding: 3px 10px; border-radius: 12px; white-space: nowrap; }
-  .badge-ok { background: #d4edda; color: #1a6b34; }
-  .badge-extern { background: #d0e8ff; color: #1F4E79; }
-  .badge-warn { background: #fff3cd; color: #856404; }
-  .badge-danger { background: #f8d7da; color: #721c24; }
-  .badge-none { background: #e9ecef; color: #6c757d; }
-  .loading { text-align: center; padding: 20px; color: #888; font-size: 10pt; }
-  .error { text-align: center; padding: 20px; color: #c0392b; font-size: 10pt; }
-  #result-box { display: none; }
-  .footer { margin-top: 20px; font-size: 8pt; color: #aaa; text-align: center; }
-</style>
-</head>
-<body>
-<div class="container">
-  <div class="header">
-    <h1>FAHRAUSWEIS-VERIFIKATION</h1>
-    <p>Ausbildungsnachweis für Flurförderzeuge</p>
-  </div>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Schulungs-Check-in</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-  <div id="search-box" class="search-box">
-    <label>Registrierungsnummer</label>
-    <div class="search-row">
-      <input type="text" id="regnr-input" placeholder="z.B. 2026-075" />
-      <button onclick="checkAusweis()">Prüfen</button>
-    </div>
-  </div>
-
-  <div id="result-box" class="result-box">
-    <div id="result-content"></div>
-  </div>
-
-  <div class="footer">DGUV Grundsatz 308-001 · VDI 2700</div>
-</div>
-
-<script>
-const FLOW_URL = 'https://default8af25f9034bc4ef4aba22ab6f641d5.01.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/349e4e8b1d45432b817f42bcd294571f/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=pLzuKj8NElFRsDTambfHKUsVmz76SVbjVv7kcXMEVo8';
-
-let urlToken = null;
-let lockedId = null;
-
-async function checkAusweis() {
-  const regnr = lockedId || document.getElementById('regnr-input').value.trim();
-  if (!regnr) return;
-
-  const box = document.getElementById('result-box');
-  const content = document.getElementById('result-content');
-  box.style.display = 'block';
-  content.innerHTML = '<div class="loading">Daten werden abgerufen...</div>';
-
-  try {
-    const body = { registrierungsnummer: regnr };
-    if (urlToken) body.token = urlToken;
-
-    const resp = await fetch(FLOW_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-
-    if (!resp.ok) throw new Error('Nicht gefunden');
-    const d = await resp.json();
-
-    if (!d || !d.name) {
-      content.innerHTML = '<div class="error">Keine Daten gefunden für: <strong>' + regnr + '</strong></div>';
-      return;
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0d1b2a;
+      color: #e8edf2;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
     }
 
-    const s1Bestanden = d.s1_praxis === 'Bestanden' && d.s1_theorie === 'Bestanden';
-    const s1Extern = d.nachweis_stufe1 === 'ja';
+    .card {
+      background: #162032;
+      border: 1px solid #1e3a5f;
+      border-radius: 12px;
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
 
-    let lasiAblaufBadge = 'badge-none';
-    let lasiAblaufText = '';
-    if (d.lasi_datum) {
-      const parts = d.lasi_datum.split('.');
-      const lasiDate = new Date(parts[2], parts[1]-1, parts[0]);
-      const ablauf = new Date(lasiDate);
-      ablauf.setFullYear(ablauf.getFullYear() + 2);
-      const lasiAblauf = ablauf.toLocaleDateString('de-DE');
-      const heute = new Date();
-      if (ablauf < heute) {
-        lasiAblaufBadge = 'badge-danger';
-        lasiAblaufText = '⚠️ Abgelaufen';
-      } else {
-        const diffDays = Math.ceil((ablauf - heute) / (1000*60*60*24));
-        if (diffDays <= 90) {
-          lasiAblaufBadge = 'badge-warn';
-          lasiAblaufText = '⚠️ läuft bald ab';
+    .logo {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #c9a84c;
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      color: #ffffff;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #7a94b0;
+      margin-bottom: 32px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #7a94b0;
+      margin-bottom: 8px;
+    }
+
+    input {
+      width: 100%;
+      background: #0d1b2a;
+      border: 1px solid #1e3a5f;
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 16px;
+      color: #e8edf2;
+      outline: none;
+      transition: border-color 0.2s;
+      margin-bottom: 24px;
+      letter-spacing: 0.05em;
+    }
+
+    input:focus {
+      border-color: #c9a84c;
+    }
+
+    input::placeholder {
+      color: #3a5572;
+    }
+
+    button {
+      width: 100%;
+      background: #c9a84c;
+      border: none;
+      border-radius: 8px;
+      padding: 15px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #0d1b2a;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    button:hover:not(:disabled) { background: #dbb95a; }
+    button:active:not(:disabled) { transform: scale(0.98); }
+    button:disabled { background: #3a5572; color: #7a94b0; cursor: not-allowed; }
+
+    .status {
+      margin-top: 20px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      display: none;
+      line-height: 1.5;
+    }
+
+    .status.success {
+      background: #0a2e1a;
+      border: 1px solid #1a6b3a;
+      color: #4cd98a;
+      display: block;
+    }
+
+    .status.error {
+      background: #2e0a0a;
+      border: 1px solid #6b1a1a;
+      color: #d94c4c;
+      display: block;
+    }
+
+    .status.loading {
+      background: #0d1b2a;
+      border: 1px solid #1e3a5f;
+      color: #7a94b0;
+      display: block;
+    }
+
+    .name-display {
+      font-size: 17px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-top: 4px;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #3a5572;
+      border-top-color: #c9a84c;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">DGUV 308-001 · Ausbildung</div>
+    <h1>Schulungs-Check-in</h1>
+    <p class="subtitle">Bitte Registrierungsnummer eingeben zur Anwesenheitserfassung.</p>
+
+    <label for="regnr">Registrierungsnummer</label>
+    <input
+      type="text"
+      id="regnr"
+      placeholder="z. B. 2026-001"
+      autocomplete="off"
+      autocorrect="off"
+      spellcheck="false"
+    />
+
+    <button id="btnCheckin" onclick="doCheckin()">Einchecken</button>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    const FLOW_URL = "https://default8af25f9034bc4ef4aba22ab6f641d5.01.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/700a9a9011d74232b5e0ca42997723aa/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=EWlMM-zKm8M48s9AYQK0JMP6mcrWDE9QhbG4WYaLCRM";
+
+    async function doCheckin() {
+      const regnr = document.getElementById('regnr').value.trim();
+      const btn = document.getElementById('btnCheckin');
+      const status = document.getElementById('status');
+
+      if (!regnr) {
+        showStatus('error', 'Bitte Registrierungsnummer eingeben.');
+        return;
+      }
+
+      btn.disabled = true;
+      showStatus('loading', '<span class="spinner"></span>Wird erfasst…');
+
+      try {
+        const response = await fetch(FLOW_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ registrierungsnummer: regnr })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          showStatus('success',
+            `✓ Anwesenheit erfasst<br>
+            <span class="name-display">${data.vorname} ${data.name}</span>
+            <br>Kurs: ${data.kursnummer} · ${data.schulungstyp}`
+          );
+          document.getElementById('regnr').value = '';
+        } else if (data.error === 'not_found') {
+          showStatus('error', 'Registrierungsnummer nicht gefunden. Bitte prüfen.');
+          btn.disabled = false;
         } else {
-          lasiAblaufBadge = 'badge-ok';
-          lasiAblaufText = 'gültig bis ' + lasiAblauf;
+          showStatus('error', 'Fehler beim Check-in. Bitte erneut versuchen.');
+          btn.disabled = false;
         }
+      } catch (e) {
+        showStatus('error', 'Verbindungsfehler. Bitte erneut versuchen.');
+        btn.disabled = false;
       }
     }
 
-    function row(label, sub, badgeText, badgeClass) {
-      return '<div class="row"><div><div class="row-label">' + label + '</div><div class="row-sub">' + sub + '</div></div><span class="badge ' + badgeClass + '">' + badgeText + '</span></div>';
+    function showStatus(type, message) {
+      const status = document.getElementById('status');
+      status.className = 'status ' + type;
+      status.innerHTML = message;
     }
 
-    let s1Row = '';
-    if (s1Extern && !s1Bestanden) {
-      s1Row = row('Stufe 1', 'Extern nachgewiesen', '✓ Extern', 'badge-extern');
-    } else if (s1Bestanden) {
-      s1Row = row('Stufe 1', 'Prüfung am ' + (d.s1_datum ? d.s1_datum.split('-').reverse().join('.') : '—'), '✓ Bestanden', 'badge-ok');
-    } else {
-      s1Row = row('Stufe 1', '—', 'nicht absolviert', 'badge-none');
-    }
-
-    let html = '<div class="person-header"><div class="person-name">' + d.vorname + ' ' + d.name + '</div><div class="person-regnr">Reg.-Nr. ' + regnr + '</div></div>';
-    html += '<div class="section-title">Stapler Stufe 1</div>' + s1Row;
-    html += '<div class="section-title">Stapler Stufe 2</div>';
-    html += (d.schubmast === 'Bestanden')
-      ? row('Schubmast', 'Prüfung am ' + (d.schubmast_datum || '—'), '✓ Bestanden', 'badge-ok')
-      : row('Schubmast', d.schubmast_gebucht === 'Ja' ? 'gebucht' : 'nicht absolviert', d.schubmast_gebucht === 'Ja' ? 'ausstehend' : '—', d.schubmast_gebucht === 'Ja' ? 'badge-warn' : 'badge-none');
-    html += (d.komm === 'Bestanden')
-      ? row('Kommissionierer', 'Prüfung am ' + (d.komm_datum || '—'), '✓ Bestanden', 'badge-ok')
-      : row('Kommissionierer', d.komm_gebucht === 'Ja' ? 'gebucht' : 'nicht absolviert', d.komm_gebucht === 'Ja' ? 'ausstehend' : '—', d.komm_gebucht === 'Ja' ? 'badge-warn' : 'badge-none');
-    html += (d.schmal === 'Bestanden')
-      ? row('Schmalgang', 'Prüfung am ' + (d.schmal_datum || '—'), '✓ Bestanden', 'badge-ok')
-      : row('Schmalgang', d.schmal_gebucht === 'Ja' ? 'gebucht' : 'nicht absolviert', d.schmal_gebucht === 'Ja' ? 'ausstehend' : '—', d.schmal_gebucht === 'Ja' ? 'badge-warn' : 'badge-none');
-    html += '<div class="section-title">Ladungssicherung VDI 2700</div>';
-    html += (d.lasi_status === 'Bestanden')
-      ? row('Ladungssicherung', 'Prüfung am ' + (d.lasi_datum || '—'), lasiAblaufText, lasiAblaufBadge)
-      : row('Ladungssicherung', '—', 'nicht absolviert', 'badge-none');
-
-    content.innerHTML = html;
-
-    // QR-Modus: result-box ohne border-top (direkt am Header)
-    if (lockedId) {
-      box.className = 'result-box-notop';
-    }
-
-  } catch(e) {
-    content.innerHTML = '<div class="error">Fehler beim Abrufen der Daten. Bitte erneut versuchen.</div>';
-  }
-}
-
-window.onload = function() {
-  const params = new URLSearchParams(window.location.search);
-  const id = params.get('id');
-  const token = params.get('token');
-
-  if (id && token) {
-    urlToken = token;
-    lockedId = id;
-    document.getElementById('search-box').style.display = 'none';
-    checkAusweis();
-  } else if (id) {
-    document.getElementById('regnr-input').value = id;
-    checkAusweis();
-  }
-};
-</script>
+    document.getElementById('regnr').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') doCheckin();
+    });
+  </script>
 </body>
 </html>
