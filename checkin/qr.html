@@ -1,0 +1,99 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Schulungs-Check-in — QR-Code</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0d1b2a;
+      color: #e8edf2;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      background: #162032;
+      border: 1px solid #1e3a5f;
+      border-radius: 12px;
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 480px;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    .logo {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #c9a84c;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      color: #ffffff;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #7a94b0;
+      margin-bottom: 32px;
+      line-height: 1.5;
+    }
+
+    .qr-wrap {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 20px;
+      display: inline-block;
+      margin-bottom: 24px;
+    }
+
+    .qr-wrap img {
+      display: block;
+      width: 320px;
+      height: 320px;
+      max-width: 100%;
+    }
+
+    .hint {
+      font-size: 13px;
+      color: #7a94b0;
+      line-height: 1.6;
+    }
+
+    .url {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #3a5572;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">DGUV 308-001 · Ausbildung</div>
+    <h1>Jetzt einchecken</h1>
+    <p class="subtitle">QR-Code mit dem Handy scannen und mit Ihrer Registrierungsnummer einchecken.</p>
+
+    <div class="qr-wrap">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=https%3A%2F%2Fdanieleckmeierausbildung1986.github.io%2Ffahrausweis-check%2Fcheckin%2F" alt="QR-Code zum Check-in">
+    </div>
+
+    <p class="hint">Diese Seite kann auf einem Bildschirm/Beamer im Schulungsraum angezeigt werden.</p>
+    <p class="url">danieleckmeierausbildung1986.github.io/fahrausweis-check/checkin/</p>
+  </div>
+</body>
+</html>
