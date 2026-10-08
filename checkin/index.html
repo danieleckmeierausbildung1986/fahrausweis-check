@@ -253,6 +253,10 @@
     </div>
 
     <div id="step-unterschrift">
+      <label for="sigVorname">Vorname</label>
+      <input type="text" id="sigVorname" placeholder="Vorname" autocomplete="off" autocorrect="off" spellcheck="false" style="margin-bottom:14px" />
+      <label for="sigNachname">Nachname</label>
+      <input type="text" id="sigNachname" placeholder="Nachname" autocomplete="off" autocorrect="off" spellcheck="false" style="margin-bottom:14px" />
       <p class="choice-label">Bitte mit dem Finger/Stift unterschreiben, um die Anwesenheit zu bestätigen.</p>
       <div class="sig-box"><canvas id="sigCanvas"></canvas></div>
       <p class="sig-hint" id="sigHint"></p>
@@ -333,7 +337,9 @@
       aktuellerTyp = typ;
       aktuellerVorname = vorname;
       aktuellerName = name;
-      document.getElementById('subtitle').textContent = (vorname || '') + ' ' + (name || '') + ' — bitte unterschreiben.';
+      document.getElementById('subtitle').textContent = (vorname || '') + ' ' + (name || '') + ' — bitte Namen eintragen und unterschreiben.';
+      document.getElementById('sigVorname').value = '';
+      document.getElementById('sigNachname').value = '';
       showStatus('', '');
       zeigeSchritt('unterschrift');
       initSigPad();
@@ -341,12 +347,18 @@
     }
 
     function jetztEinchecken(){
+      var vornameEingabe = document.getElementById('sigVorname').value.trim();
+      var nachnameEingabe = document.getElementById('sigNachname').value.trim();
+      if (!vornameEingabe || !nachnameEingabe) {
+        document.getElementById('sigHint').textContent = 'Bitte Vor- und Nachname eintragen.';
+        return;
+      }
       if (sigIstLeer()) {
         document.getElementById('sigHint').textContent = 'Bitte erst unterschreiben.';
         return;
       }
       var unterschrift = document.getElementById('sigCanvas').toDataURL('image/png');
-      checkeEin(aktuellerTyp, aktuellerVorname, aktuellerName, unterschrift);
+      checkeEin(aktuellerTyp, aktuellerVorname, aktuellerName, unterschrift, vornameEingabe, nachnameEingabe);
     }
 
     async function sucheTeilnehmer() {
@@ -416,7 +428,7 @@
       }
     }
 
-    async function checkeEin(typ, vornameVorab, nameVorab, unterschrift) {
+    async function checkeEin(typ, vornameVorab, nameVorab, unterschrift, vornameEingabe, nachnameEingabe) {
       var btnEin = document.getElementById('btnEinchecken');
       btnEin.disabled = true;
       showStatus('loading', '<span class="spinner"></span>Wird erfasst…');
@@ -425,7 +437,13 @@
         const response = await fetch(FLOW_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ registrierungsnummer: aktuelleRegnr, typ: typ, unterschrift: unterschrift })
+          body: JSON.stringify({
+            registrierungsnummer: aktuelleRegnr,
+            typ: typ,
+            unterschrift: unterschrift,
+            bestaetigt_vorname: vornameEingabe,
+            bestaetigt_nachname: nachnameEingabe
+          })
         });
         const data = await response.json();
 
