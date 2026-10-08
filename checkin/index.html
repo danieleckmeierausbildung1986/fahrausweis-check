@@ -101,6 +101,38 @@
     button:active:not(:disabled) { transform: scale(0.98); }
     button:disabled { background: #3a5572; color: #7a94b0; cursor: not-allowed; }
 
+    .kurs-choice {
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .kurs-choice.visible { display: flex; }
+
+    .kurs-btn {
+      width: 100%;
+      background: #0d1b2a;
+      border: 1.5px solid #1e3a5f;
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #e8edf2;
+      cursor: pointer;
+      text-align: left;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .kurs-btn:hover:not(:disabled) { border-color: #c9a84c; background: #1a2a40; }
+    .kurs-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .choice-label {
+      font-size: 13px;
+      color: #7a94b0;
+      margin-bottom: 14px;
+    }
+
     .status {
       margin-top: 20px;
       padding: 14px 16px;
@@ -152,44 +184,68 @@
     }
 
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    .again-btn {
+      margin-top: 14px;
+      background: transparent;
+      border: 1.5px solid #1e3a5f;
+      color: #7a94b0;
+    }
+    .again-btn:hover:not(:disabled) { border-color: #c9a84c; color: #c9a84c; background: transparent; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="logo">DGUV 308-001 · Ausbildung</div>
     <h1>Schulungs-Check-in</h1>
-    <p class="subtitle">Bitte Registrierungsnummer eingeben zur Anwesenheitserfassung.</p>
+    <p class="subtitle" id="subtitle">Bitte Registrierungsnummer eingeben zur Anwesenheitserfassung.</p>
 
-    <label for="regnr">Registrierungsnummer</label>
-    <input
-      type="text"
-      id="regnr"
-      placeholder="z. B. 2026-001"
-      autocomplete="off"
-      autocorrect="off"
-      spellcheck="false"
-    />
+    <div id="step-regnr">
+      <label for="regnr">Registrierungsnummer</label>
+      <input
+        type="text"
+        id="regnr"
+        placeholder="z. B. 2026-001"
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+      />
+      <button id="btnWeiter" onclick="sucheTeilnehmer()">Weiter</button>
+    </div>
 
-    <button id="btnCheckin" onclick="doCheckin()">Einchecken</button>
+    <div id="step-kurswahl">
+      <p class="choice-label">Für welche Schulung einchecken?</p>
+      <div class="kurs-choice visible" id="kursChoice"></div>
+    </div>
 
     <div class="status" id="status"></div>
+
+    <button class="again-btn" id="btnNochmal" style="display:none" onclick="reset()">Nächster Teilnehmer</button>
   </div>
 
   <script>
     const FLOW_URL = "https://default8af25f9034bc4ef4aba22ab6f641d5.01.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/700a9a9011d74232b5e0ca42997723aa/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=EWlMM-zKm8M48s9AYQK0JMP6mcrWDE9QhbG4WYaLCRM";
 
-    async function doCheckin() {
+    var aktuelleRegnr = '';
+
+    function zeigeSchritt(name) {
+      document.getElementById('step-regnr').style.display = name === 'regnr' ? 'block' : 'none';
+      document.getElementById('step-kurswahl').style.display = name === 'kurswahl' ? 'block' : 'none';
+      document.getElementById('btnNochmal').style.display = name === 'fertig' ? 'block' : 'none';
+    }
+
+    async function sucheTeilnehmer() {
       const regnr = document.getElementById('regnr').value.trim();
-      const btn = document.getElementById('btnCheckin');
-      const status = document.getElementById('status');
+      const btn = document.getElementById('btnWeiter');
 
       if (!regnr) {
         showStatus('error', 'Bitte Registrierungsnummer eingeben.');
         return;
       }
 
+      aktuelleRegnr = regnr;
       btn.disabled = true;
-      showStatus('loading', '<span class="spinner"></span>Wird erfasst…');
+      showStatus('loading', '<span class="spinner"></span>Suche Teilnehmer…');
 
       try {
         const response = await fetch(FLOW_URL, {
@@ -197,39 +253,103 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ registrierungsnummer: regnr })
         });
-
         const data = await response.json();
 
-        if (response.ok && data.success) {
-          showStatus('success',
-            `✓ Anwesenheit erfasst<br>
-            <span class="name-display">${data.vorname} ${data.name}</span>
-            <br>Kurs: ${data.kursnummer} · ${data.schulungstyp}`
-          );
-          document.getElementById('regnr').value = '';
-        } else if (data.error === 'not_found') {
-          showStatus('error', 'Registrierungsnummer nicht gefunden. Bitte prüfen.');
+        if (!response.ok || !data.success) {
+          if (data.error === 'not_found') {
+            showStatus('error', 'Registrierungsnummer nicht gefunden. Bitte prüfen.');
+          } else if (data.error === 'no_courses') {
+            showStatus('error', 'Für diese Registrierungsnummer sind keine Kurse gebucht.');
+          } else {
+            showStatus('error', 'Fehler beim Suchen. Bitte erneut versuchen.');
+          }
           btn.disabled = false;
-        } else {
-          showStatus('error', 'Fehler beim Check-in. Bitte erneut versuchen.');
-          btn.disabled = false;
+          return;
         }
+
+        var kurse = data.kurse || [];
+        if (kurse.length === 0) {
+          showStatus('error', 'Für diese Registrierungsnummer sind keine Kurse gebucht.');
+          btn.disabled = false;
+          return;
+        }
+
+        if (kurse.length === 1) {
+          checkeEin(kurse[0].typ, data.vorname, data.name);
+          return;
+        }
+
+        // Mehrere Kurse gebucht -> Auswahl anzeigen
+        showStatus('', '');
+        document.getElementById('status').style.display = 'none';
+        document.getElementById('subtitle').textContent = data.vorname + ' ' + data.name + ' — bitte Schulung auswählen.';
+        var choiceEl = document.getElementById('kursChoice');
+        choiceEl.innerHTML = '';
+        kurse.forEach(function(k) {
+          var kb = document.createElement('button');
+          kb.className = 'kurs-btn';
+          kb.textContent = k.label;
+          kb.onclick = function() { checkeEin(k.typ, data.vorname, data.name); };
+          choiceEl.appendChild(kb);
+        });
+        zeigeSchritt('kurswahl');
+        btn.disabled = false;
       } catch (e) {
         showStatus('error', 'Verbindungsfehler. Bitte erneut versuchen.');
         btn.disabled = false;
       }
     }
 
+    async function checkeEin(typ, vornameVorab, nameVorab) {
+      document.querySelectorAll('.kurs-btn').forEach(function(b) { b.disabled = true; });
+      showStatus('loading', '<span class="spinner"></span>Wird erfasst…');
+
+      try {
+        const response = await fetch(FLOW_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ registrierungsnummer: aktuelleRegnr, typ: typ })
+        });
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          showStatus('success',
+            `✓ Anwesenheit erfasst<br>
+            <span class="name-display">${data.vorname || vornameVorab} ${data.name || nameVorab}</span>
+            <br>Schulung: ${data.schulungstyp || typ}`
+          );
+          zeigeSchritt('fertig');
+        } else {
+          showStatus('error', 'Fehler beim Check-in. Bitte erneut versuchen.');
+          document.querySelectorAll('.kurs-btn').forEach(function(b) { b.disabled = false; });
+        }
+      } catch (e) {
+        showStatus('error', 'Verbindungsfehler. Bitte erneut versuchen.');
+        document.querySelectorAll('.kurs-btn').forEach(function(b) { b.disabled = false; });
+      }
+    }
+
     function showStatus(type, message) {
       const status = document.getElementById('status');
+      if (!type) { status.style.display = 'none'; return; }
       status.className = 'status ' + type;
       status.innerHTML = message;
     }
 
+    function reset() {
+      aktuelleRegnr = '';
+      document.getElementById('regnr').value = '';
+      document.getElementById('subtitle').textContent = 'Bitte Registrierungsnummer eingeben zur Anwesenheitserfassung.';
+      document.getElementById('btnWeiter').disabled = false;
+      showStatus('', '');
+      zeigeSchritt('regnr');
+    }
+
     document.getElementById('regnr').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') doCheckin();
+      if (e.key === 'Enter') sucheTeilnehmer();
     });
+
+    zeigeSchritt('regnr');
   </script>
 </body>
 </html>
-
