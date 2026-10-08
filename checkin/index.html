@@ -331,7 +331,8 @@
 
     function showStatus(type, message) {
       const status = document.getElementById('status');
-      if (!type) { status.style.display = 'none'; return; }
+      status.style.display = '';
+      if (!type) { status.className = 'status'; status.innerHTML = ''; return; }
       status.className = 'status ' + type;
       status.innerHTML = message;
     }
