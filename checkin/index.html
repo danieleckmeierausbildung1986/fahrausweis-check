@@ -192,6 +192,40 @@
       color: #7a94b0;
     }
     .again-btn:hover:not(:disabled) { border-color: #c9a84c; color: #c9a84c; background: transparent; }
+
+    .sig-box {
+      background: #ffffff;
+      border: 1.5px solid #1e3a5f;
+      border-radius: 8px;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    .sig-box canvas {
+      display: block;
+      width: 100%;
+      height: 150px;
+      touch-action: none;
+    }
+    .sig-hint {
+      font-size: 12px;
+      color: #7a94b0;
+      margin-bottom: 14px;
+    }
+    .sig-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .sig-row button { margin: 0; }
+    .sig-clear-btn {
+      background: transparent;
+      border: 1.5px solid #1e3a5f;
+      color: #7a94b0;
+      flex: 0 0 auto;
+      width: auto;
+      padding: 15px 18px;
+    }
+    .sig-clear-btn:hover:not(:disabled) { border-color: #c9a84c; color: #c9a84c; background: transparent; }
   </style>
 </head>
 <body>
@@ -218,6 +252,16 @@
       <div class="kurs-choice visible" id="kursChoice"></div>
     </div>
 
+    <div id="step-unterschrift">
+      <p class="choice-label">Bitte mit dem Finger/Stift unterschreiben, um die Anwesenheit zu bestätigen.</p>
+      <div class="sig-box"><canvas id="sigCanvas"></canvas></div>
+      <p class="sig-hint" id="sigHint"></p>
+      <div class="sig-row">
+        <button class="sig-clear-btn" onclick="sigLoeschen()">Löschen</button>
+        <button id="btnEinchecken" onclick="jetztEinchecken()">Jetzt einchecken</button>
+      </div>
+    </div>
+
     <div class="status" id="status"></div>
 
     <button class="again-btn" id="btnNochmal" style="display:none" onclick="reset()">Nächster Teilnehmer</button>
@@ -227,11 +271,82 @@
     const FLOW_URL = "https://default8af25f9034bc4ef4aba22ab6f641d5.01.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/700a9a9011d74232b5e0ca42997723aa/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=EWlMM-zKm8M48s9AYQK0JMP6mcrWDE9QhbG4WYaLCRM";
 
     var aktuelleRegnr = '';
+    var aktuellerTyp = '';
+    var aktuellerVorname = '';
+    var aktuellerName = '';
+    var sigPad = null;
 
     function zeigeSchritt(name) {
       document.getElementById('step-regnr').style.display = name === 'regnr' ? 'block' : 'none';
       document.getElementById('step-kurswahl').style.display = name === 'kurswahl' ? 'block' : 'none';
+      document.getElementById('step-unterschrift').style.display = name === 'unterschrift' ? 'block' : 'none';
       document.getElementById('btnNochmal').style.display = name === 'fertig' ? 'block' : 'none';
+    }
+
+    function initSigPad(){
+      var canvas = document.getElementById('sigCanvas');
+      if (sigPad === canvas) return;
+      var ratio = window.devicePixelRatio || 1;
+      canvas.width = canvas.clientWidth * ratio;
+      canvas.height = canvas.clientHeight * ratio;
+      var ctx = canvas.getContext('2d');
+      ctx.scale(ratio, ratio);
+      ctx.strokeStyle = '#16243f';
+      ctx.lineWidth = 2.2;
+      ctx.lineCap = 'round';
+      var drawing = false, last = null;
+      function pos(e){
+        var r = canvas.getBoundingClientRect();
+        return { x: e.clientX - r.left, y: e.clientY - r.top };
+      }
+      canvas.addEventListener('pointerdown', function(e){
+        drawing = true; last = pos(e); canvas.setPointerCapture(e.pointerId);
+      });
+      canvas.addEventListener('pointermove', function(e){
+        if (!drawing) return;
+        var p = pos(e);
+        ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+        last = p;
+      });
+      ['pointerup','pointerleave','pointercancel'].forEach(function(ev){
+        canvas.addEventListener(ev, function(){ drawing = false; });
+      });
+      sigPad = canvas;
+    }
+
+    function sigLoeschen(){
+      var canvas = document.getElementById('sigCanvas');
+      var ctx = canvas.getContext('2d');
+      ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.restore();
+      document.getElementById('sigHint').textContent = '';
+    }
+
+    function sigIstLeer(){
+      var canvas = document.getElementById('sigCanvas');
+      var ctx = canvas.getContext('2d');
+      var data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (var k = 3; k < data.length; k += 4) { if (data[k] !== 0) return false; }
+      return true;
+    }
+
+    function zeigeUnterschrift(typ, vorname, name){
+      aktuellerTyp = typ;
+      aktuellerVorname = vorname;
+      aktuellerName = name;
+      document.getElementById('subtitle').textContent = (vorname || '') + ' ' + (name || '') + ' — bitte unterschreiben.';
+      showStatus('', '');
+      zeigeSchritt('unterschrift');
+      initSigPad();
+      sigLoeschen();
+    }
+
+    function jetztEinchecken(){
+      if (sigIstLeer()) {
+        document.getElementById('sigHint').textContent = 'Bitte erst unterschreiben.';
+        return;
+      }
+      var unterschrift = document.getElementById('sigCanvas').toDataURL('image/png');
+      checkeEin(aktuellerTyp, aktuellerVorname, aktuellerName, unterschrift);
     }
 
     async function sucheTeilnehmer() {
@@ -275,7 +390,8 @@
         }
 
         if (kurse.length === 1) {
-          checkeEin(kurse[0].typ, data.vorname, data.name);
+          btn.disabled = false;
+          zeigeUnterschrift(kurse[0].typ, data.vorname, data.name);
           return;
         }
 
@@ -289,7 +405,7 @@
           var kb = document.createElement('button');
           kb.className = 'kurs-btn';
           kb.textContent = k.label;
-          kb.onclick = function() { checkeEin(k.typ, data.vorname, data.name); };
+          kb.onclick = function() { zeigeUnterschrift(k.typ, data.vorname, data.name); };
           choiceEl.appendChild(kb);
         });
         zeigeSchritt('kurswahl');
@@ -300,15 +416,16 @@
       }
     }
 
-    async function checkeEin(typ, vornameVorab, nameVorab) {
-      document.querySelectorAll('.kurs-btn').forEach(function(b) { b.disabled = true; });
+    async function checkeEin(typ, vornameVorab, nameVorab, unterschrift) {
+      var btnEin = document.getElementById('btnEinchecken');
+      btnEin.disabled = true;
       showStatus('loading', '<span class="spinner"></span>Wird erfasst…');
 
       try {
         const response = await fetch(FLOW_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ registrierungsnummer: aktuelleRegnr, typ: typ })
+          body: JSON.stringify({ registrierungsnummer: aktuelleRegnr, typ: typ, unterschrift: unterschrift })
         });
         const data = await response.json();
 
@@ -321,11 +438,11 @@
           zeigeSchritt('fertig');
         } else {
           showStatus('error', 'Fehler beim Check-in. Bitte erneut versuchen.');
-          document.querySelectorAll('.kurs-btn').forEach(function(b) { b.disabled = false; });
+          btnEin.disabled = false;
         }
       } catch (e) {
         showStatus('error', 'Verbindungsfehler. Bitte erneut versuchen.');
-        document.querySelectorAll('.kurs-btn').forEach(function(b) { b.disabled = false; });
+        btnEin.disabled = false;
       }
     }
 
@@ -339,9 +456,13 @@
 
     function reset() {
       aktuelleRegnr = '';
+      aktuellerTyp = '';
+      aktuellerVorname = '';
+      aktuellerName = '';
       document.getElementById('regnr').value = '';
       document.getElementById('subtitle').textContent = 'Bitte Registrierungsnummer eingeben zur Anwesenheitserfassung.';
       document.getElementById('btnWeiter').disabled = false;
+      document.getElementById('btnEinchecken').disabled = false;
       showStatus('', '');
       zeigeSchritt('regnr');
     }
