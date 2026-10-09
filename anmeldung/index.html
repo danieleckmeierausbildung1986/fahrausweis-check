@@ -76,6 +76,8 @@
     input::placeholder { color: #3a5572; }
     select { cursor: pointer; }
     select option { background: #0d1b2a; }
+    input[type="file"] { padding: 10px 12px; font-size: 14px; cursor: pointer; }
+    .hint-text { font-size: 12px; color: #7a94b0; margin-top: -14px; margin-bottom: 20px; line-height: 1.5; }
 
     button {
       width: 100%;
@@ -190,6 +192,12 @@
         </div>
       </div>
 
+      <div id="nachweisWrap" style="display:none">
+        <label>Nachweis Stufe 1 (Fahrausweis/Zertifikat)</label>
+        <input type="file" id="nachweis" accept="image/*,application/pdf" />
+        <p class="hint-text">Nur nötig, falls Sie Stufe 1 noch nicht bei uns gemacht haben — z.B. ein Foto vom Fahrausweis.</p>
+      </div>
+
       <button id="btnAnmelden" onclick="jetztAnmelden()">Jetzt anmelden</button>
     </div>
 
@@ -213,6 +221,9 @@ function initKurs() {
   if (kurs && KURS_NAMEN[kurs]) {
     document.getElementById('titel').textContent = 'Anmeldung — ' + KURS_NAMEN[kurs];
     document.getElementById('subtitle').textContent = 'Bitte trag deine Daten ein, um dich für "' + KURS_NAMEN[kurs] + '" anzumelden.';
+    if (kurs === 'stufe2') {
+      document.getElementById('nachweisWrap').style.display = 'block';
+    }
   } else {
     showStatus('error', 'Ungültiger oder fehlender Kurs-Parameter. Bitte den QR-Code erneut scannen.');
     document.getElementById('btnAnmelden').disabled = true;
@@ -223,6 +234,18 @@ function showStatus(type, message) {
   var status = document.getElementById('status');
   status.className = 'status ' + type;
   status.innerHTML = message;
+}
+
+function dateiAlsBase64(datei) {
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function() {
+      var result = reader.result;
+      resolve(result.substring(result.indexOf(',') + 1));
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(datei);
+  });
 }
 
 async function jetztAnmelden() {
@@ -253,6 +276,14 @@ async function jetztAnmelden() {
   showStatus('loading', 'Anmeldung wird übermittelt…');
 
   try {
+    var nachweisBase64 = '';
+    var nachweisDateiname = '';
+    var nachweisDatei = document.getElementById('nachweis').files[0];
+    if (kurs === 'stufe2' && nachweisDatei) {
+      nachweisBase64 = await dateiAlsBase64(nachweisDatei);
+      nachweisDateiname = nachweisDatei.name;
+    }
+
     var resp = await fetch(FLOW_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -267,7 +298,9 @@ async function jetztAnmelden() {
         telefon: telefon,
         strasse: strasse,
         plz: plz,
-        ort: ort
+        ort: ort,
+        nachweis_stufe1_base64: nachweisBase64,
+        nachweis_stufe1_dateiname: nachweisDateiname
       })
     });
     var d = await resp.json();
@@ -275,6 +308,11 @@ async function jetztAnmelden() {
     if (d && d.success) {
       document.getElementById('formBox').classList.add('hidden');
       showStatus('success', 'Anmeldung erfolgreich!<div class="regnr-display">Reg.-Nr. ' + d.registrierungsnummer + '</div>');
+    } else if (d && d.error === 'nachweis_fehlt') {
+      showStatus('error', 'Du hast Stufe 1 noch nicht bei uns gemacht — bitte lad einen Nachweis (Fahrausweis/Zertifikat) hoch, um dich für Stufe 2 anzumelden.');
+      document.getElementById('nachweisWrap').style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Jetzt anmelden';
     } else {
       showStatus('error', 'Fehler bei der Anmeldung. Bitte wende dich an deinen Trainer.');
       btn.disabled = false;
