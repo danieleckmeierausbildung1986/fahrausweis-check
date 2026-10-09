@@ -58,7 +58,7 @@
       margin-bottom: 8px;
     }
 
-    input {
+    input, select {
       width: 100%;
       background: #0d1b2a;
       border: 1px solid #1e3a5f;
@@ -69,10 +69,13 @@
       outline: none;
       transition: border-color 0.2s;
       margin-bottom: 20px;
+      font-family: inherit;
     }
 
-    input:focus { border-color: #c9a84c; }
+    input:focus, select:focus { border-color: #c9a84c; }
     input::placeholder { color: #3a5572; }
+    select { cursor: pointer; }
+    select option { background: #0d1b2a; }
 
     button {
       width: 100%;
@@ -161,6 +164,12 @@
         </div>
       </div>
 
+      <label>Schulungsform</label>
+      <select id="schulungsform">
+        <option value="Präsenz">Präsenz</option>
+        <option value="Online">Online</option>
+      </select>
+
       <label>E-Mail</label>
       <input type="email" id="email" placeholder="max@beispiel.de" />
 
@@ -221,6 +230,7 @@ async function jetztAnmelden() {
   var vorname = document.getElementById('vorname').value.trim();
   var geburtsdatum = document.getElementById('geburtsdatum').value;
   var geburtsort = document.getElementById('geburtsort').value.trim();
+  var schulungsform = document.getElementById('schulungsform').value;
   var email = document.getElementById('email').value.trim();
   var telefon = document.getElementById('telefon').value.trim();
   var strasse = document.getElementById('strasse').value.trim();
@@ -252,6 +262,7 @@ async function jetztAnmelden() {
         vorname: vorname,
         geburtsdatum: geburtsdatum,
         geburtsort: geburtsort,
+        schulungsform: schulungsform,
         email: email,
         telefon: telefon,
         strasse: strasse,
