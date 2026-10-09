@@ -1,0 +1,284 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Teilnehmeranmeldung</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0d1b2a;
+      color: #e8edf2;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      background: #162032;
+      border: 1px solid #1e3a5f;
+      border-radius: 12px;
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      color: #ffffff;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #7a94b0;
+      margin-bottom: 28px;
+    }
+
+    .row2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #7a94b0;
+      margin-bottom: 8px;
+    }
+
+    input {
+      width: 100%;
+      background: #0d1b2a;
+      border: 1px solid #1e3a5f;
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 16px;
+      color: #e8edf2;
+      outline: none;
+      transition: border-color 0.2s;
+      margin-bottom: 20px;
+    }
+
+    input:focus { border-color: #c9a84c; }
+    input::placeholder { color: #3a5572; }
+
+    button {
+      width: 100%;
+      background: #c9a84c;
+      border: none;
+      border-radius: 8px;
+      padding: 15px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #0d1b2a;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    button:hover:not(:disabled) { background: #dbb95a; }
+    button:active:not(:disabled) { transform: scale(0.98); }
+    button:disabled { background: #3a5572; color: #7a94b0; cursor: not-allowed; }
+
+    .status {
+      margin-top: 20px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      display: none;
+      line-height: 1.5;
+    }
+
+    .status.success {
+      background: #0a2e1a;
+      border: 1px solid #1a6b3a;
+      color: #4cd98a;
+      display: block;
+    }
+
+    .status.error {
+      background: #2e0a0a;
+      border: 1px solid #6b1a1a;
+      color: #d94c4c;
+      display: block;
+    }
+
+    .status.loading {
+      background: #0d1b2a;
+      border: 1px solid #1e3a5f;
+      color: #7a94b0;
+      display: block;
+    }
+
+    .regnr-display {
+      font-size: 20px;
+      font-weight: 700;
+      color: #4cd98a;
+      margin-top: 4px;
+    }
+
+    #formBox.hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1 id="titel">Teilnehmeranmeldung</h1>
+    <p class="subtitle" id="subtitle">Bitte trag deine Daten ein, um dich für die Schulung anzumelden.</p>
+
+    <div id="formBox">
+      <div class="row2">
+        <div>
+          <label>Nachname</label>
+          <input type="text" id="nachname" placeholder="Mustermann" />
+        </div>
+        <div>
+          <label>Vorname</label>
+          <input type="text" id="vorname" placeholder="Max" />
+        </div>
+      </div>
+
+      <div class="row2">
+        <div>
+          <label>Geburtsdatum</label>
+          <input type="date" id="geburtsdatum" />
+        </div>
+        <div>
+          <label>Geburtsort</label>
+          <input type="text" id="geburtsort" placeholder="Landau a.d. Isar" />
+        </div>
+      </div>
+
+      <label>E-Mail</label>
+      <input type="email" id="email" placeholder="max@beispiel.de" />
+
+      <label>Telefonnummer</label>
+      <input type="tel" id="telefon" placeholder="0160 1234567" />
+
+      <label>Straße &amp; Hausnummer</label>
+      <input type="text" id="strasse" placeholder="Musterstraße 1" />
+
+      <div class="row2">
+        <div>
+          <label>PLZ</label>
+          <input type="text" id="plz" placeholder="94436" />
+        </div>
+        <div>
+          <label>Ort</label>
+          <input type="text" id="ort" placeholder="Simbach" />
+        </div>
+      </div>
+
+      <button id="btnAnmelden" onclick="jetztAnmelden()">Jetzt anmelden</button>
+    </div>
+
+    <div class="status" id="status"></div>
+  </div>
+
+<script>
+// TODO: FLOW_URL muss noch mit der echten Power-Automate-URL befüllt werden
+// (Flow "Teilnehmer_Selbstanmeldung")
+var FLOW_URL = '';
+
+var KURS_NAMEN = {
+  stufe1: 'Stapler Stufe 1',
+  stufe2: 'Stapler Stufe 2',
+  lasi: 'Ladungssicherung'
+};
+
+var kurs = null;
+
+function initKurs() {
+  var params = new URLSearchParams(window.location.search);
+  kurs = params.get('kurs');
+  if (kurs && KURS_NAMEN[kurs]) {
+    document.getElementById('titel').textContent = 'Anmeldung — ' + KURS_NAMEN[kurs];
+    document.getElementById('subtitle').textContent = 'Bitte trag deine Daten ein, um dich für "' + KURS_NAMEN[kurs] + '" anzumelden.';
+  } else {
+    showStatus('error', 'Ungültiger oder fehlender Kurs-Parameter. Bitte den QR-Code erneut scannen.');
+    document.getElementById('btnAnmelden').disabled = true;
+  }
+}
+
+function showStatus(type, message) {
+  var status = document.getElementById('status');
+  status.className = 'status ' + type;
+  status.innerHTML = message;
+}
+
+async function jetztAnmelden() {
+  var nachname = document.getElementById('nachname').value.trim();
+  var vorname = document.getElementById('vorname').value.trim();
+  var geburtsdatum = document.getElementById('geburtsdatum').value;
+  var geburtsort = document.getElementById('geburtsort').value.trim();
+  var email = document.getElementById('email').value.trim();
+  var telefon = document.getElementById('telefon').value.trim();
+  var strasse = document.getElementById('strasse').value.trim();
+  var plz = document.getElementById('plz').value.trim();
+  var ort = document.getElementById('ort').value.trim();
+
+  if (!nachname || !vorname || !geburtsdatum || !geburtsort) {
+    showStatus('error', 'Bitte mindestens Nachname, Vorname, Geburtsdatum und Geburtsort ausfüllen.');
+    return;
+  }
+
+  if (!FLOW_URL) {
+    showStatus('error', 'Anmeldung ist technisch noch nicht fertig verbunden.');
+    return;
+  }
+
+  var btn = document.getElementById('btnAnmelden');
+  btn.disabled = true;
+  btn.textContent = 'Wird gesendet…';
+  showStatus('loading', 'Anmeldung wird übermittelt…');
+
+  try {
+    var resp = await fetch(FLOW_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        kurs: kurs,
+        nachname: nachname,
+        vorname: vorname,
+        geburtsdatum: geburtsdatum,
+        geburtsort: geburtsort,
+        email: email,
+        telefon: telefon,
+        strasse: strasse,
+        plz: plz,
+        ort: ort
+      })
+    });
+    var d = await resp.json();
+
+    if (d && d.success) {
+      document.getElementById('formBox').classList.add('hidden');
+      showStatus('success', 'Anmeldung erfolgreich!<div class="regnr-display">Reg.-Nr. ' + d.registrierungsnummer + '</div>');
+    } else {
+      showStatus('error', 'Fehler bei der Anmeldung. Bitte wende dich an deinen Trainer.');
+      btn.disabled = false;
+      btn.textContent = 'Jetzt anmelden';
+    }
+  } catch (e) {
+    showStatus('error', 'Fehler bei der Anmeldung. Bitte wende dich an deinen Trainer.');
+    btn.disabled = false;
+    btn.textContent = 'Jetzt anmelden';
+  }
+}
+
+initKurs();
+</script>
+</body>
+</html>
