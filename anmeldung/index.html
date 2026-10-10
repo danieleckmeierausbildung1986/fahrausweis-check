@@ -209,11 +209,20 @@ var FLOW_URL = 'https://default8af25f9034bc4ef4aba22ab6f641d5.01.environment.api
 
 var KURS_NAMEN = {
   stufe1: 'Stapler Stufe 1',
-  stufe2: 'Stapler Stufe 2',
+  stufe2_schubmast: 'Stapler Stufe 2 — Schubmaststapler',
+  stufe2_kommissionierer: 'Stapler Stufe 2 — Kommissionierer',
+  stufe2_schmalgang: 'Stapler Stufe 2 — Schmalgangstapler',
   lasi: 'Ladungssicherung'
 };
 
+var GERAET_NAMEN = {
+  stufe2_schubmast: 'Schubmast',
+  stufe2_kommissionierer: 'Kommissionierer',
+  stufe2_schmalgang: 'Schmalgang'
+};
+
 var kurs = null;
+var geraet = null;
 
 function initKurs() {
   var params = new URLSearchParams(window.location.search);
@@ -221,7 +230,8 @@ function initKurs() {
   if (kurs && KURS_NAMEN[kurs]) {
     document.getElementById('titel').textContent = 'Anmeldung — ' + KURS_NAMEN[kurs];
     document.getElementById('subtitle').textContent = 'Bitte trag deine Daten ein, um dich für "' + KURS_NAMEN[kurs] + '" anzumelden.';
-    if (kurs === 'stufe2') {
+    if (GERAET_NAMEN[kurs]) {
+      geraet = GERAET_NAMEN[kurs];
       document.getElementById('nachweisWrap').style.display = 'block';
     }
   } else {
@@ -279,7 +289,7 @@ async function jetztAnmelden() {
     var nachweisBase64 = '';
     var nachweisDateiname = '';
     var nachweisDatei = document.getElementById('nachweis').files[0];
-    if (kurs === 'stufe2' && nachweisDatei) {
+    if (geraet && nachweisDatei) {
       nachweisBase64 = await dateiAlsBase64(nachweisDatei);
       nachweisDateiname = nachweisDatei.name;
     }
@@ -288,7 +298,8 @@ async function jetztAnmelden() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        kurs: kurs,
+        kurs: geraet ? 'stufe2' : kurs,
+        geraet: geraet || '',
         nachname: nachname,
         vorname: vorname,
         geburtsdatum: geburtsdatum,
